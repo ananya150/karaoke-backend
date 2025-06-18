@@ -148,7 +148,7 @@ class RedisClient:
                 if isinstance(value, (dict, list)):
                     processed_mapping[key] = json.dumps(value)
                 elif value is None:
-                    processed_mapping[key] = ""  # Store None as empty string
+                    processed_mapping[key] = "None"  # Store None as "None" string for clarity
                 elif hasattr(value, 'value'):  # Handle Enum types
                     processed_mapping[key] = value.value
                 else:
@@ -188,6 +188,8 @@ class RedisClient:
                 for key, value in data.items():
                     if value == "":  # Handle empty strings as None
                         processed_data[key] = None
+                    elif value == "None":  # Keep "None" string as "None" for proper enum handling
+                        processed_data[key] = "None"
                     else:
                         try:
                             processed_data[key] = json.loads(value)

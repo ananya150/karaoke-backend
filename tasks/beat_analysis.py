@@ -27,7 +27,6 @@ def analyze_beats_task(self, job_id: str, audio_file_path: str, job_dir: str, co
         Dictionary with beat analysis results and metadata
     """
     task_logger = get_task_logger("beat_analysis")
-    redis_client = get_redis_client()
     
     try:
         task_logger.info("Starting beat analysis", 
@@ -36,9 +35,11 @@ def analyze_beats_task(self, job_id: str, audio_file_path: str, job_dir: str, co
                         audio_file_path=audio_file_path)
         
         # Update job status
-        redis_client.hset(f"job:{job_id}", 
-                         "beat_analysis_status", "processing",
-                         "beat_analysis_progress", "0")
+        with get_redis_client() as redis_client:
+            redis_client.hset(f"job:{job_id}", {
+                "beat_analysis_status": "processing",
+                "beat_analysis_progress": "0"
+            })
         
         # Validate inputs
         if not os.path.exists(audio_file_path):
@@ -49,8 +50,10 @@ def analyze_beats_task(self, job_id: str, audio_file_path: str, job_dir: str, co
         
         # Progress callback for Redis updates
         def progress_callback(progress: int):
-            redis_client.hset(f"job:{job_id}", 
-                             "beat_analysis_progress", str(progress))
+            with get_redis_client() as redis_client:
+                redis_client.hset(f"job:{job_id}", {
+                    "beat_analysis_progress": str(progress)
+                })
             task_logger.info("Beat analysis progress", 
                            job_id=job_id, 
                            progress=f"{progress}%")
@@ -101,7 +104,7 @@ def analyze_beats_task(self, job_id: str, audio_file_path: str, job_dir: str, co
         
         # Build final result
         result = {
-            'success': True,
+            'success': 1,
             'tempo_bpm': analysis_result.get('tempo_bpm', 0),
             'beat_timestamps': analysis_result.get('beats', []),
             'beat_times': analysis_result.get('beat_times', []),
@@ -138,18 +141,20 @@ def analyze_beats_task(self, job_id: str, audio_file_path: str, job_dir: str, co
             
             # Quality metrics
             'tempo_confidence': analysis_data.get('tempo_analysis', {}).get('tempo_confidence', 0.0),
-            'has_strong_beat': metadata.get('beat_count', 0) > 10 and analysis_data.get('tempo_analysis', {}).get('beat_confidence', 0) > 0.5
+            'has_strong_beat': 1 if (metadata.get('beat_count', 0) > 10 and analysis_data.get('tempo_analysis', {}).get('beat_confidence', 0) > 0.5) else 0
         }
         
         # Update job status with results
-        redis_client.hset(f"job:{job_id}", 
-                         "beat_analysis_status", "completed",
-                         "beat_analysis_progress", "100",
-                         "tempo_bpm", str(result['tempo_bpm']),
-                         "beat_count", str(result['beat_count']),
-                         "time_signature", result['time_signature'],
-                         "beat_confidence", str(result['beat_confidence']),
-                         "rhythm_regularity", str(result['rhythm_regularity']))
+        with get_redis_client() as redis_client:
+            redis_client.hset(f"job:{job_id}", {
+                "beat_analysis_status": "completed",
+                "beat_analysis_progress": "100",
+                "tempo_bpm": str(result['tempo_bpm']),
+                "beat_count": str(result['beat_count']),
+                "time_signature": result['time_signature'],
+                "beat_confidence": str(result['beat_confidence']),
+                "rhythm_regularity": str(result['rhythm_regularity'])
+            })
         
         task_logger.info("Beat analysis completed successfully", 
                         job_id=job_id,
@@ -170,12 +175,14 @@ def analyze_beats_task(self, job_id: str, audio_file_path: str, job_dir: str, co
                          exc_info=True)
         
         # Update job status with error
-        redis_client.hset(f"job:{job_id}", 
-                         "beat_analysis_status", "error",
-                         "beat_analysis_error", error_msg)
+        with get_redis_client() as redis_client:
+            redis_client.hset(f"job:{job_id}", {
+                "beat_analysis_status": "error",
+                "beat_analysis_error": error_msg
+            })
         
         return {
-            'success': False,
+            'success': 0,
             'error': error_msg,
             'tempo_bpm': 0,
             'beat_timestamps': [],
@@ -198,5 +205,5 @@ def analyze_beats_task(self, job_id: str, audio_file_path: str, job_dir: str, co
             'rhythm_regularity': 0.0,
             'rhythm_complexity': 'unknown',
             'tempo_confidence': 0.0,
-            'has_strong_beat': False
+            'has_strong_beat': 0
         } 

@@ -215,7 +215,7 @@ class WhisperHandler:
                 progress_callback(100)
             
             return {
-                'success': True,
+                'success': 1,
                 'transcription': transcription_data,
                 'output_files': output_files,
                 'metadata': metadata,
@@ -229,7 +229,7 @@ class WhisperHandler:
             logger.error("Audio transcription failed", error=str(e), exc_info=True)
             
             return {
-                'success': False,
+                'success': 0,
                 'error': error_msg,
                 'transcription': {},
                 'output_files': {},

@@ -27,7 +27,6 @@ def transcribe_audio_task(self, job_id: str, vocal_stem_path: str, job_dir: str,
         Dictionary with transcription results and metadata
     """
     task_logger = get_task_logger("transcription")
-    redis_client = get_redis_client()
     
     try:
         task_logger.info("Starting vocal transcription", 
@@ -36,9 +35,11 @@ def transcribe_audio_task(self, job_id: str, vocal_stem_path: str, job_dir: str,
                         vocal_stem_path=vocal_stem_path)
         
         # Update job status
-        redis_client.hset(f"job:{job_id}", 
-                         "transcription_status", "processing",
-                         "transcription_progress", "0")
+        with get_redis_client() as redis_client:
+            redis_client.hset(f"job:{job_id}", {
+                "transcription_status": "processing",
+                "transcription_progress": "0"
+            })
         
         # Validate inputs
         if not os.path.exists(vocal_stem_path):
@@ -49,8 +50,10 @@ def transcribe_audio_task(self, job_id: str, vocal_stem_path: str, job_dir: str,
         
         # Progress callback for Redis updates
         def progress_callback(progress: int):
-            redis_client.hset(f"job:{job_id}", 
-                             "transcription_progress", str(progress))
+            with get_redis_client() as redis_client:
+                redis_client.hset(f"job:{job_id}", {
+                    "transcription_progress": str(progress)
+                })
             task_logger.info("Transcription progress", 
                            job_id=job_id, 
                            progress=f"{progress}%")
@@ -97,7 +100,7 @@ def transcribe_audio_task(self, job_id: str, vocal_stem_path: str, job_dir: str,
         
         # Build final result
         result = {
-            'success': True,
+            'success': 1,
             'transcript_text': transcription_data.get('text', ''),
             'language': transcription_result.get('language', 'unknown'),
             'duration': transcription_data.get('duration', 0.0),
@@ -120,17 +123,19 @@ def transcribe_audio_task(self, job_id: str, vocal_stem_path: str, job_dir: str,
             
             # Statistics
             'segment_count': len(transcription_data.get('segments', [])),
-            'has_word_timestamps': len(transcription_data.get('words', [])) > 0,
+            'has_word_timestamps': 1 if len(transcription_data.get('words', [])) > 0 else 0,
         }
         
         # Update job status with results
-        redis_client.hset(f"job:{job_id}", 
-                         "transcription_status", "completed",
-                         "transcription_progress", "100",
-                         "transcript_text", result['transcript_text'],
-                         "transcription_language", result['language'],
-                         "transcription_duration", str(result['duration']),
-                         "word_count", str(result['word_count']))
+        with get_redis_client() as redis_client:
+            redis_client.hset(f"job:{job_id}", {
+                "transcription_status": "completed",
+                "transcription_progress": "100",
+                "transcript_text": result['transcript_text'],
+                "transcription_language": result['language'],
+                "transcription_duration": str(result['duration']),
+                "word_count": str(result['word_count'])
+            })
         
         task_logger.info("Transcription completed successfully", 
                         job_id=job_id,
@@ -150,12 +155,14 @@ def transcribe_audio_task(self, job_id: str, vocal_stem_path: str, job_dir: str,
                          exc_info=True)
         
         # Update job status with error
-        redis_client.hset(f"job:{job_id}", 
-                         "transcription_status", "error",
-                         "transcription_error", error_msg)
+        with get_redis_client() as redis_client:
+            redis_client.hset(f"job:{job_id}", {
+                "transcription_status": "error",
+                "transcription_error": error_msg
+            })
         
         return {
-            'success': False,
+            'success': 0,
             'error': error_msg,
             'transcript_text': '',
             'language': 'unknown',

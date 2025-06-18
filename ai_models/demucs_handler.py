@@ -30,11 +30,11 @@ class DemucsConfig:
     
     def __init__(self):
         # Model selection - options: 'htdemucs', 'htdemucs_ft', 'htdemucs_6s', 'mdx_extra_q', 'mdx_q', 'mdx'
-        self.model_name = "htdemucs"  # Best quality/speed balance for karaoke
+        self.model_name = "mdx_q"  # More stable model for various audio formats
         
         # Processing parameters
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.segment_length = 8.0  # Conservative segment length for stability
+        self.segment_length = None  # Process full track without segmentation
         self.overlap = 0.25  # Overlap between segments
         self.batch_size = 1  # Process one file at a time
         
@@ -155,12 +155,23 @@ class DemucsHandler:
             model_sample_rate = getattr(self.model, 'samplerate', getattr(self.model, 'sample_rate', 44100))
             model_audio_channels = getattr(self.model, 'audio_channels', 2)
             
+            logger.info("Converting audio format",
+                       original_sr=sample_rate,
+                       target_sr=model_sample_rate,
+                       original_channels=waveform.shape[0],
+                       target_channels=model_audio_channels,
+                       original_shape=waveform.shape)
+            
             waveform = convert_audio(
                 waveform, 
                 sample_rate, 
                 model_sample_rate, 
                 model_audio_channels
             )
+            
+            logger.info("Audio conversion completed", 
+                       final_shape=waveform.shape,
+                       final_sr=model_sample_rate)
             
             if progress_callback:
                 progress_callback(30)
@@ -215,7 +226,7 @@ class DemucsHandler:
                 progress_callback(100)
             
             return {
-                'success': True,
+                'success': 1,
                 'stems': stem_paths,
                 'metadata': metadata,
                 'vocals_path': stem_paths.get('vocals'),
@@ -227,7 +238,7 @@ class DemucsHandler:
             logger.error("Stem separation failed", error=str(e), exc_info=True)
             
             return {
-                'success': False,
+                'success': 0,
                 'error': error_msg,
                 'stems': {},
                 'metadata': {}

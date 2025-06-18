@@ -134,11 +134,11 @@ class JobManager:
             
             # Always add to status index (remove duplicates later if needed)
             # Handle case where status might be None
-            if job_data.status is not None:
+            if job_data.status is not None and hasattr(job_data.status, 'value'):
                 status_key = f"jobs:status:{job_data.status.value}"
                 self.redis.lpush(status_key, job_data.job_id)
             else:
-                logger.warning("Job status is None, skipping status index", job_id=job_data.job_id)
+                logger.warning("Job status is None or invalid, skipping status index", job_id=job_data.job_id)
             
             # Check if job exists in Redis to determine success
             # hset returns 0 when updating existing fields with same values
@@ -181,27 +181,30 @@ class JobManager:
                     job_dict[field] = {} if field in ['stems', 'processing_config'] else None
             
             # Handle enum fields - convert string values back to enums
-            if 'status' in job_dict and job_dict['status']:
+            if 'status' in job_dict and job_dict['status'] and job_dict['status'] != 'None' and job_dict['status'] is not None:
                 try:
                     job_dict['status'] = JobStatus(job_dict['status'])
                 except ValueError:
                     # Fallback to QUEUED if invalid status
                     job_dict['status'] = JobStatus.QUEUED
+            else:
+                # Default to QUEUED if status is None, "None", or missing
+                job_dict['status'] = JobStatus.QUEUED
             
-            if 'current_step' in job_dict and job_dict['current_step'] and job_dict['current_step'] != 'None':
+            if 'current_step' in job_dict and job_dict['current_step'] and job_dict['current_step'] != 'None' and job_dict['current_step'] is not None:
                 try:
                     job_dict['current_step'] = ProcessingStep(job_dict['current_step'])
                 except ValueError:
                     job_dict['current_step'] = None
-            elif 'current_step' in job_dict and job_dict['current_step'] == 'None':
+            else:
                 job_dict['current_step'] = None
             
-            if 'error_step' in job_dict and job_dict['error_step'] and job_dict['error_step'] != 'None':
+            if 'error_step' in job_dict and job_dict['error_step'] and job_dict['error_step'] != 'None' and job_dict['error_step'] is not None:
                 try:
                     job_dict['error_step'] = ProcessingStep(job_dict['error_step'])
                 except ValueError:
                     job_dict['error_step'] = None
-            elif 'error_step' in job_dict and job_dict['error_step'] == 'None':
+            else:
                 job_dict['error_step'] = None
             
             # Convert back to JobData model
@@ -252,8 +255,9 @@ class JobManager:
             
             # Save updated job data
             if self.save_job(job_data):
+                status_value = status.value if status and hasattr(status, 'value') else str(status)
                 logger.log_job_event(job_id, "status_updated", 
-                                    status=status.value, progress=job_data.progress)
+                                    status=status_value, progress=job_data.progress)
                 return True
             
             return False

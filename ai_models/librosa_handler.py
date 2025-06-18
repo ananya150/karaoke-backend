@@ -175,7 +175,7 @@ class LibrosaHandler:
                 progress_callback(100)
             
             return {
-                'success': True,
+                'success': 1,
                 'analysis': analysis_results,
                 'output_files': output_files,
                 'metadata': metadata,
@@ -190,7 +190,7 @@ class LibrosaHandler:
             logger.error("Audio analysis failed", error=str(e), exc_info=True)
             
             return {
-                'success': False,
+                'success': 0,
                 'error': error_msg,
                 'analysis': {},
                 'output_files': {},

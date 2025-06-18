@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 
 from config import settings
 from utils.logger import setup_logging, logger
-from routes import health, upload, status, results
+from routes import health, upload, status, results, static
 
 
 @asynccontextmanager
@@ -123,6 +123,7 @@ app.include_router(health.router, tags=["Health"])
 app.include_router(upload.router, prefix="/api", tags=["Upload"])
 app.include_router(status.router, prefix="/api", tags=["Status"])
 app.include_router(results.router, prefix="/api", tags=["Results"])
+app.include_router(static.router, prefix="/api", tags=["Files"])
 
 # Static files (for serving processed audio files)
 if os.path.exists("storage"):
@@ -143,6 +144,7 @@ async def root():
             "process": "/api/process",
             "status": "/api/status/{job_id}",
             "results": "/api/results/{job_id}",
+            "files": "/api/files/{job_id}/{filename}",
             "static": "/static/{path}"
         }
     }

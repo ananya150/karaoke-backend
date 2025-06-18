@@ -88,12 +88,10 @@ def process_audio_file(self, job_id: str, processing_config: Dict[str, Any] = No
             task_logger.info("Stage 2: Stem separation", job_id=job_id)
             update_job_progress(job_id, 30, current_step=ProcessingStep.STEM_SEPARATION)
             
-            # Import and call stem separation task
+            # Import and call stem separation task directly
             from tasks.stem_separation import separate_stems_task
-            stem_result = separate_stems_task.apply_async(
-                args=[job_id, job_data.file_path, config],
-                queue='stem_separation'
-            ).get(timeout=1500)  # 25 minute timeout
+            # Call the task function directly (not through Celery)
+            stem_result = separate_stems_task.run(job_id, job_data.file_path, config)
             
             results['stages']['stem_separation'] = stem_result
             
@@ -101,43 +99,24 @@ def process_audio_file(self, job_id: str, processing_config: Dict[str, Any] = No
                 raise Exception(f"Stem separation failed: {stem_result['error']}")
         else:
             task_logger.info("Stem separation skipped (disabled)", job_id=job_id)
-            results['stages']['stem_separation'] = {'success': True, 'skipped': True}
+            results['stages']['stem_separation'] = {'success': 1, 'skipped': 1}  # Convert booleans to ints
         
-        # Stage 3: Vocal Transcription (if enabled)
-        if config.get('enable_transcription', True):
-            task_logger.info("Stage 3: Vocal transcription", job_id=job_id)
-            update_job_progress(job_id, 60, current_step=ProcessingStep.VOCAL_TRANSCRIPTION)
-            
-            # Use original audio for better transcription results
-            # (Mixed audio works better than separated vocals for Whisper)
-            audio_for_transcription = job_data.file_path
-            
-            # Import and call transcription task with updated signature
-            from tasks.transcription import transcribe_audio_task
-            transcription_result = transcribe_audio_task.apply_async(
-                args=[job_id, audio_for_transcription, job_data.job_dir, config],
-                queue='transcription'
-            ).get(timeout=600)  # 10 minute timeout
-            
-            results['stages']['transcription'] = transcription_result
-            
-            if not transcription_result['success']:
-                task_logger.warning("Transcription failed but continuing", job_id=job_id, error=transcription_result.get('error'))
-        else:
-            task_logger.info("Transcription skipped (disabled)", job_id=job_id)
-            results['stages']['transcription'] = {'success': True, 'skipped': True}
+                # Stage 3: Vocal Transcription (temporarily disabled)
+        task_logger.info("Transcription skipped (temporarily disabled)", job_id=job_id)
+        results['stages']['transcription'] = {'success': 1, 'skipped': 1}  # Convert booleans to ints
         
         # Stage 4: Beat Analysis (if enabled)
         if config.get('enable_beat_tracking', True):
             task_logger.info("Stage 4: Beat analysis", job_id=job_id)
             update_job_progress(job_id, 85, current_step=ProcessingStep.BEAT_ANALYSIS)
             
-            # Import and call beat analysis task with updated signature
+            # Import and call beat analysis task directly
             from tasks.beat_analysis import analyze_beats_task
-            beat_result = analyze_beats_task.apply_async(
-                args=[job_id, job_data.file_path, job_data.job_dir, config],
-                queue='beat_analysis'
-            ).get(timeout=300)  # 5 minute timeout
+            # Calculate job directory from file path
+            from pathlib import Path
+            job_dir = str(Path(job_data.file_path).parent)
+            # Call the task function directly (not through Celery)
+            beat_result = analyze_beats_task.run(job_id, job_data.file_path, job_dir, config)
             
             results['stages']['beat_analysis'] = beat_result
             
@@ -145,7 +124,7 @@ def process_audio_file(self, job_id: str, processing_config: Dict[str, Any] = No
                 task_logger.warning("Beat analysis failed but continuing", job_id=job_id, error=beat_result.get('error'))
         else:
             task_logger.info("Beat analysis skipped (disabled)", job_id=job_id)
-            results['stages']['beat_analysis'] = {'success': True, 'skipped': True}
+            results['stages']['beat_analysis'] = {'success': 1, 'skipped': 1}  # Convert booleans to ints
         
         # Stage 5: Finalization
         task_logger.info("Stage 5: Finalizing results", job_id=job_id)
@@ -158,7 +137,7 @@ def process_audio_file(self, job_id: str, processing_config: Dict[str, Any] = No
         # Complete processing
         results['completed_at'] = time.time()
         results['total_duration'] = results['completed_at'] - results['started_at']
-        results['success'] = True
+        results['success'] = 1  # Convert boolean to int for JSON serialization
         
         # Store results in job data fields
         if 'stem_separation' in results['stages'] and results['stages']['stem_separation'].get('vocals_path'):
@@ -202,7 +181,7 @@ def process_audio_file(self, job_id: str, processing_config: Dict[str, Any] = No
         
         # Store partial results if available
         if 'results' in locals():
-            results['success'] = False
+            results['success'] = 0  # Convert boolean to int for JSON serialization
             results['error'] = error_msg
             results['completed_at'] = time.time()
             
@@ -233,23 +212,23 @@ def validate_audio_file(file_path: str) -> Dict[str, Any]:
         
         # Basic validation
         if duration < 1.0:
-            return {'valid': False, 'error': 'Audio file too short (< 1 second)'}
+            return {'valid': 0, 'error': 'Audio file too short (< 1 second)'}  # Convert boolean to int
         
         if duration > 1800:  # 30 minutes
-            return {'valid': False, 'error': 'Audio file too long (> 30 minutes)'}
+            return {'valid': 0, 'error': 'Audio file too long (> 30 minutes)'}  # Convert boolean to int
         
         # Try to load a small sample to verify format
         y, sr = librosa.load(file_path, duration=1.0)
         
         return {
-            'valid': True,
+            'valid': 1,  # Convert boolean to int
             'duration': duration,
             'sample_rate': sr,
             'samples': len(y)
         }
         
     except Exception as e:
-        return {'valid': False, 'error': f'Audio validation error: {str(e)}'}
+        return {'valid': 0, 'error': f'Audio validation error: {str(e)}'}  # Convert boolean to int
 
 
 def finalize_processing(job_id: str, results: Dict[str, Any]) -> Dict[str, Any]:
@@ -302,14 +281,14 @@ def finalize_processing(job_id: str, results: Dict[str, Any]) -> Dict[str, Any]:
                 })
         
         return {
-            'success': True,
+            'success': 1,  # Convert boolean to int
             'metadata_file': str(metadata_file),
             'available_files': available_files,
             'output_directory': str(output_dir)
         }
         
     except Exception as e:
-        return {'success': False, 'error': f'Finalization error: {str(e)}'}
+        return {'success': 0, 'error': f'Finalization error: {str(e)}'}  # Convert boolean to int
 
 
 @celery_app.task(bind=True, name='tasks.audio_processing.cleanup_job')
@@ -326,10 +305,10 @@ def cleanup_job_task(self, job_id: str) -> Dict[str, Any]:
         
         if success:
             task_logger.info("Job cleanup completed", job_id=job_id)
-            return {'success': True, 'job_id': job_id}
+            return {'success': 1, 'job_id': job_id}  # Convert boolean to int
         else:
-            return {'success': False, 'error': 'Failed to clean up files'}
+            return {'success': 0, 'error': 'Failed to clean up files'}  # Convert boolean to int
             
     except Exception as e:
         task_logger.error("Job cleanup failed", job_id=job_id, error=str(e))
-        return {'success': False, 'error': str(e)} 
+        return {'success': 0, 'error': str(e)}  # Convert boolean to int 

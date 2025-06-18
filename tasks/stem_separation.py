@@ -117,7 +117,7 @@ def separate_stems_task(self, job_id: str, audio_file_path: str, config: Dict[st
         task_logger.error("Stem separation failed", job_id=job_id, error=str(e), exc_info=True)
         
         return {
-            'success': False,
+            'success': 0,
             'error': error_msg,
             'stems': {},
             'metadata': {}
@@ -155,10 +155,10 @@ def optimize_stems_task(self, job_id: str, stems_paths: Dict[str, str], config: 
         task_logger.info("Stem optimization completed", job_id=job_id)
         
         return {
-            'success': True,
+            'success': 1,
             'optimized_stems': optimized_paths,
             'metadata': {
-                'optimization_applied': False,  # Change to True when implemented
+                'optimization_applied': 0,  # Change to 1 when implemented
                 'techniques': []  # List of applied optimization techniques
             }
         }
@@ -168,7 +168,7 @@ def optimize_stems_task(self, job_id: str, stems_paths: Dict[str, str], config: 
         task_logger.error("Stem optimization failed", job_id=job_id, error=str(e))
         
         return {
-            'success': False,
+            'success': 0,
             'error': error_msg,
             'optimized_stems': {},
             'metadata': {}
