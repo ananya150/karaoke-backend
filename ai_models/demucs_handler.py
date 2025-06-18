@@ -34,7 +34,7 @@ class DemucsConfig:
         
         # Processing parameters
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.segment_length = None  # Auto-detect based on available memory
+        self.segment_length = 8.0  # Conservative segment length for stability
         self.overlap = 0.25  # Overlap between segments
         self.batch_size = 1  # Process one file at a time
         

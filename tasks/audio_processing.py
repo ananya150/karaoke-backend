@@ -103,20 +103,19 @@ def process_audio_file(self, job_id: str, processing_config: Dict[str, Any] = No
             task_logger.info("Stem separation skipped (disabled)", job_id=job_id)
             results['stages']['stem_separation'] = {'success': True, 'skipped': True}
         
-        # Stage 3: Vocal Transcription (if enabled and vocals available)
-        if config.get('enable_vocals_extraction', True):
+        # Stage 3: Vocal Transcription (if enabled)
+        if config.get('enable_transcription', True):
             task_logger.info("Stage 3: Vocal transcription", job_id=job_id)
             update_job_progress(job_id, 60, current_step=ProcessingStep.VOCAL_TRANSCRIPTION)
             
-            # Use separated vocals if available, otherwise original file
+            # Use original audio for better transcription results
+            # (Mixed audio works better than separated vocals for Whisper)
             audio_for_transcription = job_data.file_path
-            if 'stem_separation' in results['stages'] and results['stages']['stem_separation'].get('vocals_path'):
-                audio_for_transcription = results['stages']['stem_separation']['vocals_path']
             
-            # Import and call transcription task
+            # Import and call transcription task with updated signature
             from tasks.transcription import transcribe_audio_task
             transcription_result = transcribe_audio_task.apply_async(
-                args=[job_id, audio_for_transcription, config],
+                args=[job_id, audio_for_transcription, job_data.job_dir, config],
                 queue='transcription'
             ).get(timeout=600)  # 10 minute timeout
             
