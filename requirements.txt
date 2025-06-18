@@ -13,11 +13,12 @@ soundfile==0.12.1
 
 # AI Models
 openai-whisper==20231117
-torch==2.1.1
-torchaudio==2.1.1
+torch>=2.2.0
+torchaudio>=2.2.0
 
 # File Handling
 python-magic==0.4.27
+aiofiles==23.2.1
 
 # Environment & Configuration
 python-dotenv==1.0.0
