@@ -131,7 +131,13 @@ dmypy.json
 # Project specific
 storage/
 logs/
-models/
+# Ignore AI model files (not Python model modules)
+*.pkl
+*.pth
+*.onnx
+*.h5
+*.joblib
+# Audio files
 *.wav
 *.mp3
 *.m4a

@@ -41,29 +41,34 @@
 
 ---
 
-### ✅ Step 4: File Upload and Storage System
-- [ ] Implement file upload endpoint (`POST /process`)
-- [ ] Create secure file validation (format, size limits)
-- [ ] Set up job directory structure creation
-- [ ] Implement temporary file storage system
-- [ ] Add file cleanup mechanisms
-- [ ] Test file upload with various audio formats
+### ✅ Step 4: File Upload and Storage System - COMPLETED
+- [x] Implement file upload endpoint (`POST /process`)
+- [x] Create secure file validation (format, size limits)
+- [x] Set up job directory structure creation
+- [x] Implement temporary file storage system
+- [x] Add file cleanup mechanisms
+- [x] Test file upload with various audio formats
 
-**Key Files to Create:**
+**Key Files Created:**
 - `routes/upload.py`, `utils/file_handler.py`, `storage/`
 
 ---
 
-### ✅ Step 5: Celery Task Queue Integration
-- [ ] Install and configure Celery
-- [ ] Set up Redis as message broker for Celery
-- [ ] Create Celery application instance
-- [ ] Implement basic task structure and worker configuration
-- [ ] Create task for audio processing pipeline
-- [ ] Test task queue with simple background jobs
+### ✅ Step 5: Celery Task Queue Integration - COMPLETED
+- [x] Install and configure Celery
+- [x] Set up Redis as message broker for Celery
+- [x] Create Celery application instance
+- [x] Implement basic task structure and worker configuration
+- [x] Create task for audio processing pipeline
+- [x] Test task queue with simple background jobs
 
-**Key Files to Create:**
-- `celery_app.py`, `tasks/`, `worker.py`
+**Key Files Created:**
+- `celery_app.py` - Celery configuration with Redis broker/backend and task routing
+- `worker.py` - Celery worker script with multi-queue support
+- `tasks/audio_processing.py` - Main orchestration pipeline task
+- `tasks/stem_separation.py` - Placeholder stem separation task  
+- `tasks/transcription.py` - Placeholder transcription task
+- `tasks/beat_analysis.py` - Placeholder beat analysis task
 
 ---
 

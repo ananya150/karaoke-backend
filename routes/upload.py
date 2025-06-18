@@ -138,6 +138,34 @@ async def process_audio(
                 current_step=ProcessingStep.VALIDATION
             )
             
+            # Start background processing task
+            try:
+                from tasks.audio_processing import process_audio_file
+                task = process_audio_file.apply_async(
+                    args=[job_id, processing_config],
+                    queue='audio_processing'
+                )
+                
+                # Store task ID in job data for tracking
+                job_data = job_manager.get_job(job_id)
+                job_data.task_id = task.id
+                job_manager.save_job(job_data)
+                
+                logger.info(
+                    "Background processing task started",
+                    job_id=job_id,
+                    task_id=task.id
+                )
+                
+            except Exception as e:
+                logger.error("Failed to start background task", job_id=job_id, error=str(e))
+                # Don't fail the upload, but mark as failed processing
+                job_manager.update_job_status(
+                    job_id,
+                    JobStatus.FAILED,
+                    error_message=f"Failed to start processing: {str(e)}"
+                )
+            
             # Calculate estimated processing time based on file size
             estimated_minutes = max(1, file_info['file_size'] // (1024 * 1024))  # ~1 min per MB
             estimated_time = f"{estimated_minutes}-{estimated_minutes * 2} minutes"
