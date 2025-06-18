@@ -5,7 +5,8 @@ Handles environment variables and provides default values.
 
 import os
 from typing import List, Optional
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
     upload_folder: str = Field(default="storage/uploads", env="UPLOAD_FOLDER")
     jobs_folder: str = Field(default="storage/jobs", env="JOBS_FOLDER")
     max_file_size: str = Field(default="100MB", env="MAX_FILE_SIZE")
-    allowed_extensions: List[str] = Field(default=["mp3", "wav", "m4a", "flac"], env="ALLOWED_EXTENSIONS")
+    allowed_extensions: str = Field(default="mp3,wav,m4a,flac", env="ALLOWED_EXTENSIONS")
     
     # AI Models Configuration
     whisper_model: str = Field(default="base", env="WHISPER_MODEL")
@@ -50,8 +51,8 @@ class Settings(BaseSettings):
     
     # Security
     secret_key: str = Field(default="dev-secret-key-change-in-production", env="SECRET_KEY")
-    cors_origins: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8080"], 
+    cors_origins: str = Field(
+        default="http://localhost:3000,http://localhost:8080", 
         env="CORS_ORIGINS"
     )
     
@@ -83,6 +84,16 @@ class Settings(BaseSettings):
             return int(size_str[:-2]) * 1024 * 1024 * 1024
         else:
             return int(size_str)
+    
+    @property
+    def allowed_extensions_list(self) -> List[str]:
+        """Convert comma-separated allowed extensions to list."""
+        return [ext.strip() for ext in self.allowed_extensions.split(',')]
+    
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Convert comma-separated CORS origins to list."""
+        return [origin.strip() for origin in self.cors_origins.split(',')]
     
     def create_directories(self):
         """Create necessary directories if they don't exist."""
