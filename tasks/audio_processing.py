@@ -132,10 +132,10 @@ def process_audio_file(self, job_id: str, processing_config: Dict[str, Any] = No
             task_logger.info("Stage 4: Beat analysis", job_id=job_id)
             update_job_progress(job_id, 85, current_step=ProcessingStep.BEAT_ANALYSIS)
             
-            # Import and call beat analysis task
+            # Import and call beat analysis task with updated signature
             from tasks.beat_analysis import analyze_beats_task
             beat_result = analyze_beats_task.apply_async(
-                args=[job_id, job_data.file_path, config],
+                args=[job_id, job_data.file_path, job_data.job_dir, config],
                 queue='beat_analysis'
             ).get(timeout=300)  # 5 minute timeout
             
