@@ -1,0 +1,41 @@
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Task Queue
+celery==5.3.4
+redis==5.0.1
+
+# Audio Processing
+librosa==0.10.1
+soundfile==0.12.1
+
+# AI Models
+openai-whisper==20231117
+torch==2.1.1
+torchaudio==2.1.1
+
+# File Handling
+python-magic==0.4.27
+
+# Environment & Configuration
+python-dotenv==1.0.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Utilities
+uuid==1.30
+httpx==0.25.2
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+flake8==6.1.0
+
+# Logging
+structlog==23.2.0
+
+# Optional: For deployment
+gunicorn==21.2.0 
