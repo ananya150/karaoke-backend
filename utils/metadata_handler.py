@@ -305,7 +305,7 @@ class AudioMetadataExtractor:
             
             # Create job directory if it doesn't exist
             from config import settings
-            job_dir = Path(settings.storage_path) / "jobs" / job_id
+            job_dir = Path(settings.jobs_folder) / job_id
             job_dir.mkdir(parents=True, exist_ok=True)
             
             # Save cover art

@@ -215,7 +215,11 @@ async def get_job_results(job_id: str):
                     except (ValueError, TypeError):
                         metadata_values[field_name] = None
                 else:
-                    metadata_values[field_name] = value if value and value != 'None' else None
+                    # String fields - ensure they are strings
+                    if value and value != 'None':
+                        metadata_values[field_name] = str(value)
+                    else:
+                        metadata_values[field_name] = None
             
             audio_metadata = AudioMetadata(**metadata_values)
         
