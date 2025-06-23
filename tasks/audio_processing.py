@@ -88,6 +88,9 @@ def process_audio_file(self, job_id: str, processing_config: Dict[str, Any] = No
             task_logger.info("Stage 2: Stem separation", job_id=job_id)
             update_job_progress(job_id, 30, current_step=ProcessingStep.STEM_SEPARATION)
             
+            # Update task status
+            job_manager.update_task_status(job_id, "stem_separation", "processing", 0)
+            
             # Import and call stem separation task directly
             from tasks.stem_separation import separate_stems_task
             # Call the task function directly (not through Celery)
@@ -95,20 +98,39 @@ def process_audio_file(self, job_id: str, processing_config: Dict[str, Any] = No
             
             results['stages']['stem_separation'] = stem_result
             
-            if not stem_result['success']:
+            if stem_result['success']:
+                # Update task status with results
+                job_manager.update_task_status(
+                    job_id, "stem_separation", "completed", 100,
+                    vocals_path=stem_result.get('stems', {}).get('vocals'),
+                    drums_path=stem_result.get('stems', {}).get('drums'),
+                    bass_path=stem_result.get('stems', {}).get('bass'),
+                    other_path=stem_result.get('stems', {}).get('other'),
+                    processing_time=stem_result.get('metadata', {}).get('processing_time')
+                )
+            else:
+                job_manager.update_task_status(
+                    job_id, "stem_separation", "failed", 0, 
+                    error=stem_result.get('error')
+                )
                 raise Exception(f"Stem separation failed: {stem_result['error']}")
         else:
             task_logger.info("Stem separation skipped (disabled)", job_id=job_id)
+            job_manager.update_task_status(job_id, "stem_separation", "skipped", 100)
             results['stages']['stem_separation'] = {'success': 1, 'skipped': 1}  # Convert booleans to ints
         
-                # Stage 3: Vocal Transcription (temporarily disabled)
+        # Stage 3: Vocal Transcription (temporarily disabled)
         task_logger.info("Transcription skipped (temporarily disabled)", job_id=job_id)
+        job_manager.update_task_status(job_id, "transcription", "skipped", 100)
         results['stages']['transcription'] = {'success': 1, 'skipped': 1}  # Convert booleans to ints
         
         # Stage 4: Beat Analysis (if enabled)
         if config.get('enable_beat_tracking', True):
             task_logger.info("Stage 4: Beat analysis", job_id=job_id)
             update_job_progress(job_id, 85, current_step=ProcessingStep.BEAT_ANALYSIS)
+            
+            # Update task status
+            job_manager.update_task_status(job_id, "beat_analysis", "processing", 0)
             
             # Import and call beat analysis task directly
             from tasks.beat_analysis import analyze_beats_task
@@ -120,10 +142,26 @@ def process_audio_file(self, job_id: str, processing_config: Dict[str, Any] = No
             
             results['stages']['beat_analysis'] = beat_result
             
-            if not beat_result['success']:
+            if beat_result['success']:
+                # Update task status with results
+                job_manager.update_task_status(
+                    job_id, "beat_analysis", "completed", 100,
+                    tempo_bpm=beat_result.get('tempo_bpm'),
+                    beat_count=beat_result.get('beat_count'),
+                    time_signature=beat_result.get('time_signature'),
+                    beat_confidence=beat_result.get('beat_confidence'),
+                    rhythm_regularity=beat_result.get('rhythm_regularity'),
+                    processing_time=beat_result.get('processing_time')
+                )
+            else:
+                job_manager.update_task_status(
+                    job_id, "beat_analysis", "failed", 0,
+                    error=beat_result.get('error')
+                )
                 task_logger.warning("Beat analysis failed but continuing", job_id=job_id, error=beat_result.get('error'))
         else:
             task_logger.info("Beat analysis skipped (disabled)", job_id=job_id)
+            job_manager.update_task_status(job_id, "beat_analysis", "skipped", 100)
             results['stages']['beat_analysis'] = {'success': 1, 'skipped': 1}  # Convert booleans to ints
         
         # Stage 5: Finalization

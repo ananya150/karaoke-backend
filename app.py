@@ -47,9 +47,9 @@ setup_logging()
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_origins=["*"] if "*" in settings.cors_origins else settings.cors_origins_list,
+    allow_credentials=False if "*" in settings.cors_origins else True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

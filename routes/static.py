@@ -61,115 +61,79 @@ async def download_file(
 ):
     """
     Download a processed file for a specific job.
-    
-    Args:
-        job_id: Unique job identifier
-        filename: Name of the file to download
-        inline: Whether to display inline (True) or as attachment (False)
-        
-    Returns:
-        File response with appropriate headers
-        
-    Raises:
-        HTTPException: 404 if job/file not found, 403 if access denied, 500 for internal errors
     """
     try:
-        logger.info("File download requested", job_id=job_id, filename=filename, inline=inline)
-        
+        logger.info("File download request", job_id=job_id, filename=filename, inline=inline)
         with get_redis_client() as redis_client:
-            # Check if job exists
             job_exists = redis_client.exists(f"job:{job_id}")
-            if not job_exists:
-                logger.warning("Job not found for file download", job_id=job_id, filename=filename)
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Job {job_id} not found"
-                )
+            logger.info("Job exists check", job_id=job_id, exists=job_exists)
             
-            # Get job data to verify file ownership
+            if not job_exists:
+                raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+            
             job_data = redis_client.hgetall(f"job:{job_id}")
-            job_dir = job_data.get('job_dir')
+            original_file_path = job_data.get('file_path')
+            logger.info("Got job data", original_file_path=original_file_path)
+            
+            if original_file_path:
+                job_dir = os.path.dirname(original_file_path)
+            else:
+                job_dir = None
+            
+            logger.info("Job directory", job_dir=job_dir, exists=os.path.exists(job_dir) if job_dir else False)
         
         if not job_dir or not os.path.exists(job_dir):
-            logger.error("Job directory not found", job_id=job_id, job_dir=job_dir)
-            raise HTTPException(
-                status_code=404,
-                detail="Job files not found"
-            )
+            raise HTTPException(status_code=404, detail="Job files not found")
         
-        # Construct file path and verify it's safe
-        file_path = os.path.join(job_dir, filename)
+        # Search in multiple directories
+        search_directories = [
+            ("stems", "stems"),
+            ("beat_analysis", "beat_analysis"),
+            ("transcription", "transcription"),
+            ("results", "results"),
+            ("", "root")  # Root job directory
+        ]
         
-        # Security check: ensure the file is within the job directory
-        if not is_safe_path(job_dir, filename):
-            logger.warning("Unsafe file path requested", job_id=job_id, filename=filename, file_path=file_path)
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied: Invalid file path"
-            )
+        found_path = None
+        found_mime_type = None
         
-        # Check if file exists
-        if not os.path.exists(file_path):
-            # Try looking in subdirectories
-            possible_paths = [
-                os.path.join(job_dir, "stems", filename),
-                os.path.join(job_dir, "transcription", filename),
-                os.path.join(job_dir, "beat_analysis", filename),
-                os.path.join(job_dir, "results", filename)
-            ]
-            
-            for possible_path in possible_paths:
-                if os.path.exists(possible_path) and is_safe_path(job_dir, os.path.relpath(possible_path, job_dir)):
-                    file_path = possible_path
-                    break
+        for subdir, dir_name in search_directories:
+            if subdir:
+                search_path = os.path.join(job_dir, subdir, filename)
             else:
-                logger.warning("File not found", job_id=job_id, filename=filename, file_path=file_path)
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"File {filename} not found"
-                )
+                search_path = os.path.join(job_dir, filename)
+            
+            logger.info(f"Checking {dir_name} directory", search_path=search_path, exists=os.path.exists(search_path))
+            
+            if os.path.exists(search_path):
+                found_path = search_path
+                found_mime_type = get_file_mime_type(search_path)
+                logger.info(f"Found file in {dir_name} directory", path=found_path, mime_type=found_mime_type)
+                break
         
-        # Get file information
-        file_size = os.path.getsize(file_path)
-        mime_type = get_file_mime_type(file_path)
+        if found_path:
+            # Determine content disposition
+            disposition = "inline" if inline else "attachment"
+            
+            return FileResponse(
+                path=found_path,
+                filename=filename,
+                media_type=found_mime_type,
+                headers={
+                    "Content-Disposition": f'{disposition}; filename="{filename}"',
+                    "X-Job-ID": job_id
+                }
+            )
         
-        logger.info("Serving file", 
-                   job_id=job_id, 
-                   filename=filename, 
-                   file_path=file_path,
-                   file_size=file_size,
-                   mime_type=mime_type,
-                   inline=inline)
-        
-        # Determine content disposition
-        disposition_type = "inline" if inline else "attachment"
-        
-        # Return file response
-        return FileResponse(
-            path=file_path,
-            filename=filename,
-            media_type=mime_type,
-            headers={
-                "Content-Disposition": f'{disposition_type}; filename="{filename}"',
-                "Content-Length": str(file_size),
-                "Cache-Control": "private, max-age=3600",  # Cache for 1 hour
-                "X-Job-ID": job_id
-            }
-        )
+        # If not found, return 404
+        logger.warning("File not found anywhere", job_id=job_id, filename=filename)
+        raise HTTPException(status_code=404, detail=f"File {filename} not found")
         
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        logger.error("Failed to serve file", 
-                    job_id=job_id, 
-                    filename=filename, 
-                    error=str(e), 
-                    exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="Internal server error while serving file"
-        )
+        logger.error("Unexpected error in file serving", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/files/{job_id}")
@@ -200,7 +164,13 @@ async def list_job_files(job_id: str):
             
             # Get job data
             job_data = redis_client.hgetall(f"job:{job_id}")
-            job_dir = job_data.get('job_dir')
+            file_path = job_data.get('file_path')
+            
+            # Extract job directory from file path
+            if file_path:
+                job_dir = os.path.dirname(file_path)
+            else:
+                job_dir = None
         
         if not job_dir or not os.path.exists(job_dir):
             raise HTTPException(
@@ -226,8 +196,8 @@ async def list_job_files(job_id: str):
                                 "category": category,
                                 "size": file_size,
                                 "mime_type": mime_type,
-                                "download_url": f"/files/{job_id}/{file}",
-                                "preview_url": f"/files/{job_id}/{file}?inline=true" if mime_type.startswith(('audio/', 'text/', 'application/json')) else None
+                                "download_url": f"/api/files/{job_id}/{file}",
+                                "preview_url": f"/api/files/{job_id}/{file}?inline=true" if mime_type.startswith(('audio/', 'text/', 'application/json')) else None
                             })
                         except:
                             pass  # Skip files that can't be accessed

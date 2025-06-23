@@ -25,6 +25,7 @@ torchaudio>=2.2.0
 # File Handling
 python-magic==0.4.27
 aiofiles==23.2.1
+mutagen==1.47.0
 
 # Environment & Configuration
 python-dotenv==1.0.0

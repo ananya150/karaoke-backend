@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     # Security
     secret_key: str = Field(default="dev-secret-key-change-in-production", env="SECRET_KEY")
     cors_origins: str = Field(
-        default="http://localhost:3000,http://localhost:8080", 
+        default="*", 
         env="CORS_ORIGINS"
     )
     

@@ -130,6 +130,25 @@ async def process_audio(
             job_data.file_size = file_info['file_size']
             job_manager.save_job(job_data)
             
+            # Store metadata in Redis if available
+            if file_info.get('metadata'):
+                metadata = file_info['metadata']
+                try:
+                    from database.redis_client import get_redis_client
+                    with get_redis_client() as redis_client:
+                        # Store audio metadata fields
+                        metadata_fields = {}
+                        for key, value in metadata.items():
+                            if value is not None:
+                                metadata_fields[f"metadata_{key}"] = str(value)
+                        
+                        if metadata_fields:
+                            redis_client.hset(f"job:{job_id}", metadata_fields)
+                            logger.info("Audio metadata stored", job_id=job_id, fields_count=len(metadata_fields))
+                            
+                except Exception as e:
+                    logger.error("Failed to store metadata in Redis", job_id=job_id, error=str(e))
+            
             # Update job status to indicate file upload is complete
             job_manager.update_job_status(
                 job_id,

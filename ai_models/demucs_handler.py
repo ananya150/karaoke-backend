@@ -179,6 +179,37 @@ class DemucsHandler:
             # Apply stem separation
             logger.info("Applying Demucs model for stem separation")
             
+            # Start a progress estimation thread for the long AI processing step
+            import threading
+            
+            processing_complete = False
+            
+            def estimate_progress():
+                """Provide estimated progress during AI processing."""
+                import time as time_module
+                start_progress = 30
+                end_progress = 70
+                estimated_duration = max(10.0, duration * 0.3)  # Estimate based on audio duration
+                
+                start_time = time_module.time()
+                while not processing_complete:
+                    elapsed = time_module.time() - start_time
+                    if elapsed >= estimated_duration:
+                        break
+                    
+                    # Linear interpolation between start and end progress
+                    current_progress = start_progress + (end_progress - start_progress) * (elapsed / estimated_duration)
+                    if progress_callback:
+                        progress_callback(int(current_progress))
+                    
+                    time_module.sleep(2)  # Update every 2 seconds
+            
+            # Start progress estimation thread
+            if progress_callback:
+                progress_thread = threading.Thread(target=estimate_progress)
+                progress_thread.daemon = True
+                progress_thread.start()
+            
             with torch.no_grad():
                 # Move to device
                 waveform = waveform.to(self.config.device)
@@ -197,6 +228,9 @@ class DemucsHandler:
                 
                 # Remove batch dimension
                 separated = separated[0]
+            
+            # Stop progress estimation
+            processing_complete = True
             
             if progress_callback:
                 progress_callback(70)

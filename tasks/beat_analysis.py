@@ -149,11 +149,22 @@ def analyze_beats_task(self, job_id: str, audio_file_path: str, job_dir: str, co
             redis_client.hset(f"job:{job_id}", {
                 "beat_analysis_status": "completed",
                 "beat_analysis_progress": "100",
-                "tempo_bpm": str(result['tempo_bpm']),
-                "beat_count": str(result['beat_count']),
-                "time_signature": result['time_signature'],
-                "beat_confidence": str(result['beat_confidence']),
-                "rhythm_regularity": str(result['rhythm_regularity'])
+                "beat_analysis_tempo_bpm": str(result['tempo_bpm']),
+                "beat_analysis_beat_count": str(result['beat_count']),
+                "beat_analysis_time_signature": result['time_signature'],
+                "beat_analysis_beat_confidence": str(result['beat_confidence']),
+                "beat_analysis_rhythm_regularity": str(result['rhythm_regularity']),
+                "beat_analysis_processing_time": str(result['processing_time']),
+                "beat_analysis_audio_duration": str(result['audio_duration']),
+                "beat_analysis_beat_interval": str(result['beat_interval']),
+                "beat_analysis_onset_count": str(result['onset_count']),
+                "beat_analysis_onset_density": str(result['onset_density']),
+                "beat_analysis_rhythm_complexity": result['rhythm_complexity'],
+                "beat_analysis_tempo_confidence": str(result['tempo_confidence']),
+                "beat_analysis_has_strong_beat": str(result['has_strong_beat']),
+                "beat_analysis_json": result.get('analysis_json', ''),
+                "beats_json": result.get('beats_json', ''),
+                "onsets_json": result.get('onsets_json', '')
             })
         
         task_logger.info("Beat analysis completed successfully", 

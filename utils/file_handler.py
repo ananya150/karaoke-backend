@@ -330,19 +330,30 @@ class FileManager:
                            ", ".join(self.validator.get_allowed_extensions())
                 )
             
+            # Extract audio metadata and cover art
+            try:
+                from utils.metadata_handler import metadata_extractor
+                metadata = metadata_extractor.extract_metadata(file_path, job_id)
+            except Exception as e:
+                logger.warning("Failed to extract metadata", job_id=job_id, error=str(e))
+                metadata = {}
+            
             result = {
                 'filename': upload_file.filename,
                 'file_path': file_path,
                 'file_size': actual_size,
                 'file_hash': file_hash,
-                'content_type': upload_file.content_type
+                'content_type': upload_file.content_type,
+                'metadata': metadata
             }
             
             logger.info(
                 "File upload processed successfully",
                 job_id=job_id,
                 filename=upload_file.filename,
-                file_size=actual_size
+                file_size=actual_size,
+                has_metadata=bool(metadata),
+                has_cover=bool(metadata.get('cover_image_path'))
             )
             
             return result

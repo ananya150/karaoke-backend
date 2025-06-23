@@ -292,6 +292,41 @@ class JobManager:
             logger.error("Failed to update job progress", job_id=job_id, error=str(e))
             return False
     
+    def update_task_status(self, job_id: str, task_name: str, status: str, 
+                          progress: int = 0, error: Optional[str] = None, 
+                          **kwargs) -> bool:
+        """Update individual task status within a job."""
+        try:
+            job_key = f"job:{job_id}"
+            
+            # Update task-specific fields
+            task_fields = {
+                f"{task_name}_status": status,
+                f"{task_name}_progress": str(progress),
+                f"{task_name}_updated_at": str(time.time())
+            }
+            
+            if error:
+                task_fields[f"{task_name}_error"] = error
+            
+            # Add any additional task-specific fields
+            for key, value in kwargs.items():
+                task_fields[f"{task_name}_{key}"] = str(value) if value is not None else None
+            
+            # Update Redis hash
+            success = self.redis.hset(job_key, task_fields)
+            
+            if success:
+                logger.info("Task status updated", job_id=job_id, task=task_name, status=status, progress=progress)
+            else:
+                logger.error("Failed to update task status", job_id=job_id, task=task_name)
+            
+            return bool(success)
+            
+        except Exception as e:
+            logger.error("Failed to update task status", job_id=job_id, task=task_name, error=str(e), exc_info=True)
+            return False
+    
     def set_job_results(self, job_id: str, 
                        stems: Optional[Dict[str, str]] = None,
                        lyrics: Optional[Dict[str, Any]] = None,

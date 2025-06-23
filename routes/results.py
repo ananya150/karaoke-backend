@@ -45,10 +45,42 @@ class BeatAnalysisResults(BaseModel):
     time_signature: Optional[str] = None
     beat_confidence: Optional[float] = None
     rhythm_regularity: Optional[float] = None
+    processing_time: Optional[float] = None
+    audio_duration: Optional[float] = None
+    beat_interval: Optional[float] = None
+    onset_count: Optional[int] = None
+    onset_density: Optional[float] = None
+    rhythm_complexity: Optional[str] = None
+    tempo_confidence: Optional[float] = None
+    has_strong_beat: Optional[bool] = None
     analysis_json: Optional[str] = None
     beats_json: Optional[str] = None
     onsets_json: Optional[str] = None
-    processing_time: Optional[float] = None
+
+
+class AudioMetadata(BaseModel):
+    """Audio metadata information."""
+    title: Optional[str] = None
+    artist: Optional[str] = None
+    album: Optional[str] = None
+    albumartist: Optional[str] = None
+    date: Optional[str] = None
+    year: Optional[int] = None
+    genre: Optional[str] = None
+    track: Optional[int] = None
+    tracktotal: Optional[int] = None
+    disc: Optional[int] = None
+    duration: Optional[float] = None
+    bitrate: Optional[int] = None
+    sample_rate: Optional[int] = None
+    channels: Optional[int] = None
+    format: Optional[str] = None
+    filesize: Optional[int] = None
+    cover_image_path: Optional[str] = None
+    cover_image_format: Optional[str] = None
+    cover_image_size: Optional[int] = None
+    cover_image_width: Optional[int] = None
+    cover_image_height: Optional[int] = None
 
 
 class JobResults(BaseModel):
@@ -64,6 +96,9 @@ class JobResults(BaseModel):
     original_filename: Optional[str] = None
     audio_duration: Optional[float] = None
     file_size: Optional[int] = None
+    
+    # Audio metadata
+    audio_metadata: Optional[AudioMetadata] = None
     
     # Processing results
     stem_separation: Optional[StemSeparationResults] = None
@@ -159,15 +194,40 @@ async def get_job_results(job_id: str):
         audio_duration = float(job_data.get('audio_duration', 0)) if job_data.get('audio_duration') else None
         file_size = int(job_data.get('file_size', 0)) if job_data.get('file_size') else None
         
+        # Build audio metadata
+        audio_metadata = None
+        metadata_fields = {k: v for k, v in job_data.items() if k.startswith('metadata_')}
+        if metadata_fields:
+            # Remove the 'metadata_' prefix and convert types
+            metadata_values = {}
+            for key, value in metadata_fields.items():
+                field_name = key[9:]  # Remove 'metadata_' prefix
+                
+                # Convert to appropriate types
+                if field_name in ['year', 'track', 'tracktotal', 'disc', 'bitrate', 'sample_rate', 'channels', 'filesize', 'cover_image_size', 'cover_image_width', 'cover_image_height']:
+                    try:
+                        metadata_values[field_name] = int(value) if value and value != 'None' else None
+                    except (ValueError, TypeError):
+                        metadata_values[field_name] = None
+                elif field_name in ['duration']:
+                    try:
+                        metadata_values[field_name] = float(value) if value and value != 'None' else None
+                    except (ValueError, TypeError):
+                        metadata_values[field_name] = None
+                else:
+                    metadata_values[field_name] = value if value and value != 'None' else None
+            
+            audio_metadata = AudioMetadata(**metadata_values)
+        
         # Build stem separation results
         stem_separation = None
         if job_data.get('stem_separation_status') == 'completed':
             stem_separation = StemSeparationResults(
-                vocals_path=job_data.get('vocals_path'),
-                drums_path=job_data.get('drums_path'),
-                bass_path=job_data.get('bass_path'),
-                other_path=job_data.get('other_path'),
-                processing_time=float(job_data.get('stem_separation_time', 0)) if job_data.get('stem_separation_time') else None,
+                vocals_path=job_data.get('stem_separation_vocals_path'),
+                drums_path=job_data.get('stem_separation_drums_path'),
+                bass_path=job_data.get('stem_separation_bass_path'),
+                other_path=job_data.get('stem_separation_other_path'),
+                processing_time=float(job_data.get('stem_separation_processing_time', 0)) if job_data.get('stem_separation_processing_time') else None,
                 separation_model=job_data.get('stem_separation_model', 'htdemucs')
             )
         
@@ -178,7 +238,7 @@ async def get_job_results(job_id: str):
                 transcription_path=job_data.get('transcription_path'),
                 language=job_data.get('transcription_language'),
                 word_count=int(job_data.get('transcription_word_count', 0)) if job_data.get('transcription_word_count') else None,
-                processing_time=float(job_data.get('transcription_time', 0)) if job_data.get('transcription_time') else None,
+                processing_time=float(job_data.get('transcription_processing_time', 0)) if job_data.get('transcription_processing_time') else None,
                 confidence=float(job_data.get('transcription_confidence', 0)) if job_data.get('transcription_confidence') else None
             )
         
@@ -186,15 +246,22 @@ async def get_job_results(job_id: str):
         beat_analysis = None
         if job_data.get('beat_analysis_status') == 'completed':
             beat_analysis = BeatAnalysisResults(
-                tempo_bpm=float(job_data.get('tempo_bpm', 0)) if job_data.get('tempo_bpm') else None,
-                beat_count=int(job_data.get('beat_count', 0)) if job_data.get('beat_count') else None,
-                time_signature=job_data.get('time_signature'),
-                beat_confidence=float(job_data.get('beat_confidence', 0)) if job_data.get('beat_confidence') else None,
-                rhythm_regularity=float(job_data.get('rhythm_regularity', 0)) if job_data.get('rhythm_regularity') else None,
+                tempo_bpm=float(job_data.get('beat_analysis_tempo_bpm', 0)) if job_data.get('beat_analysis_tempo_bpm') else None,
+                beat_count=int(job_data.get('beat_analysis_beat_count', 0)) if job_data.get('beat_analysis_beat_count') else None,
+                time_signature=job_data.get('beat_analysis_time_signature'),
+                beat_confidence=float(job_data.get('beat_analysis_beat_confidence', 0)) if job_data.get('beat_analysis_beat_confidence') else None,
+                rhythm_regularity=float(job_data.get('beat_analysis_rhythm_regularity', 0)) if job_data.get('beat_analysis_rhythm_regularity') else None,
+                processing_time=float(job_data.get('beat_analysis_processing_time', 0)) if job_data.get('beat_analysis_processing_time') else None,
+                audio_duration=float(job_data.get('beat_analysis_audio_duration', 0)) if job_data.get('beat_analysis_audio_duration') else None,
+                beat_interval=float(job_data.get('beat_analysis_beat_interval', 0)) if job_data.get('beat_analysis_beat_interval') else None,
+                onset_count=int(job_data.get('beat_analysis_onset_count', 0)) if job_data.get('beat_analysis_onset_count') else None,
+                onset_density=float(job_data.get('beat_analysis_onset_density', 0)) if job_data.get('beat_analysis_onset_density') else None,
+                rhythm_complexity=job_data.get('beat_analysis_rhythm_complexity'),
+                tempo_confidence=float(job_data.get('beat_analysis_tempo_confidence', 0)) if job_data.get('beat_analysis_tempo_confidence') else None,
+                has_strong_beat=bool(int(job_data.get('beat_analysis_has_strong_beat', 0))) if job_data.get('beat_analysis_has_strong_beat') else None,
                 analysis_json=job_data.get('beat_analysis_json'),
                 beats_json=job_data.get('beats_json'),
-                onsets_json=job_data.get('onsets_json'),
-                processing_time=float(job_data.get('beat_analysis_time', 0)) if job_data.get('beat_analysis_time') else None
+                onsets_json=job_data.get('onsets_json')
             )
         
         # Collect all output files
@@ -211,12 +278,12 @@ async def get_job_results(job_id: str):
             ]:
                 if path and os.path.exists(path):
                     output_files.append(path)
-                    download_links[f"{stem_type}_stem"] = f"/files/{job_id}/{os.path.basename(path)}"
+                    download_links[f"{stem_type}_stem"] = f"/api/files/{job_id}/{os.path.basename(path)}"
         
         # Add transcription files
         if transcription and transcription.transcription_path and os.path.exists(transcription.transcription_path):
             output_files.append(transcription.transcription_path)
-            download_links["transcription"] = f"/files/{job_id}/{os.path.basename(transcription.transcription_path)}"
+            download_links["transcription"] = f"/api/files/{job_id}/{os.path.basename(transcription.transcription_path)}"
         
         # Add beat analysis files
         if beat_analysis:
@@ -227,7 +294,12 @@ async def get_job_results(job_id: str):
             ]:
                 if path and os.path.exists(path):
                     output_files.append(path)
-                    download_links[f"beat_{analysis_type}"] = f"/files/{job_id}/{os.path.basename(path)}"
+                    download_links[f"beat_{analysis_type}"] = f"/api/files/{job_id}/{os.path.basename(path)}"
+        
+        # Add cover image to download links if available
+        if audio_metadata and audio_metadata.cover_image_path and os.path.exists(audio_metadata.cover_image_path):
+            cover_filename = os.path.basename(audio_metadata.cover_image_path)
+            download_links["cover_image"] = f"/api/files/{job_id}/{cover_filename}"
         
         # Build response
         results = JobResults(
@@ -240,6 +312,7 @@ async def get_job_results(job_id: str):
             original_filename=original_filename,
             audio_duration=audio_duration,
             file_size=file_size,
+            audio_metadata=audio_metadata,
             stem_separation=stem_separation,
             transcription=transcription,
             beat_analysis=beat_analysis,

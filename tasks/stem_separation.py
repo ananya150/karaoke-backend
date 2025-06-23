@@ -85,6 +85,13 @@ def separate_stems_task(self, job_id: str, audio_file_path: str, config: Dict[st
                 progress=task_progress,
                 current_step=ProcessingStep.STEM_SEPARATION
             )
+            # Also update the individual task status
+            job_manager.update_task_status(
+                job_id=job_id,
+                task_name="stem_separation",
+                status="processing",
+                progress=progress
+            )
             task_logger.info(f"Stem separation progress: {progress}%", job_id=job_id)
         
         # Perform stem separation
